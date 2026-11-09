@@ -1,9 +1,11 @@
-// Pluggable AI for the "Ask" chat.
-// - Demo provider: runs on the phone with no key, answering from Pawgress's built-in dog-care knowledge.
-// - Proxy provider: sends the chat (and photo) to your own server (see /server), which calls Claude.
-// Switch by setting EXPO_PUBLIC_AI_PROXY_URL at build time, or Profile → AI connection in the app.
+// Pluggable AI for the "Ask" chat. Each owner picks one in Profile → AI connection:
+// - Demo: runs on the phone with no key, answering from Pawgress's built-in dog-care knowledge.
+// - Claude with your own key: the owner's own Anthropic API key, kept in the phone's secure storage.
+//   Calls go straight from the phone to Anthropic and are billed to the owner's account.
+// - Server: sends the chat to a server you run (see /server), which holds the key.
 
-import type { ChatMessage, Dog } from './types';
+import Anthropic from '@anthropic-ai/sdk';
+import type { AiMode, ChatMessage, Dog } from './types';
 import { snapshot, ageLabel, latestWeightKg } from './dogmath';
 import { findFoodFacts, type Verdict } from '@/data/foodSafety';
 import { pottyGuide } from '@/data/stages';
@@ -21,7 +23,7 @@ export interface AIReply {
 }
 
 export interface AIProvider {
-  id: 'demo' | 'proxy';
+  id: 'demo' | 'proxy' | 'claude';
   label: string;
   send(history: OutgoingMessage[], dog: Dog | null): Promise<AIReply>;
 }
@@ -39,6 +41,97 @@ export function dogSummary(dog: Dog | null): string {
     `Activity: ${dog.activity}`,
     dog.allergies.length ? `Known allergies or sensitivities: ${dog.allergies.join(', ')}` : 'No known allergies',
   ].join('\n');
+}
+
+// ---------- Shared instructions ----------
+
+export const SYSTEM_PROMPT = `You are Pawgress, a warm, practical assistant for dog owners, many of them new to dogs.
+You help with feeding, food safety, growth, potty training, training, grooming, exercise, behavior and everyday care.
+
+How to answer:
+- Lead with the direct answer in one sentence, then give the key reasons and what to do. Keep it short enough to read on a phone.
+- Personalize to the dog profile you are given (age, breed, weight, allergies, calorie target).
+- When the owner shares a photo, say what you see in it first. If you are not sure what it is, say so and ask.
+- When the question is whether the dog can eat something, start your reply with exactly one line:
+  VERDICT: safe | VERDICT: caution | VERDICT: unsafe
+  then a blank line, then your answer. Only add this line for food or ingestion questions.
+- If anything suggests poisoning, trouble breathing, collapse, a bloated belly, repeated vomiting, or blood, tell the owner to contact their vet or an emergency vet now, before any other advice.
+- You are not a vet and cannot diagnose. Recommend a vet visit when symptoms last, worsen, or worry the owner.
+- Use plain words, no markdown headings. Short bullet lists are fine.`;
+
+export function parseVerdict(text: string): AIReply {
+  const m = text.match(/^\s*VERDICT:\s*(safe|caution|unsafe)\s*\n+/i);
+  if (!m) return { text: text.trim() };
+  return { verdict: m[1].toLowerCase() as Verdict, text: text.slice(m[0].length).trim() };
+}
+
+// ---------- Claude with the owner's own API key ----------
+
+export const CLAUDE_MODEL = 'claude-opus-5-5';
+
+export function claudeProvider(apiKey: string): AIProvider {
+  const client = new Anthropic({
+    apiKey,
+    // The key belongs to the person holding this phone and is read from its secure storage,
+    // so calling Anthropic directly from the device is intended here.
+    dangerouslyAllowBrowser: true,
+    maxRetries: 1,
+    timeout: 120_000,
+  });
+  return {
+    id: 'claude',
+    label: 'Claude · your account',
+    async send(history, dog) {
+      const messages: Anthropic.Beta.BetaMessageParam[] = [];
+      for (const m of history.slice(-20)) {
+        if (m.role === 'assistant') {
+          if (m.text) messages.push({ role: 'assistant', content: m.text });
+          continue;
+        }
+        const content: Anthropic.Beta.BetaContentBlockParam[] = [];
+        if (m.image?.data) {
+          content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: m.image.data } });
+        }
+        content.push({ type: 'text', text: m.text.trim() || 'What can you tell me about this for my dog?' });
+        messages.push({ role: 'user', content });
+      }
+      while (messages.length && messages[0].role !== 'user') messages.shift();
+
+      try {
+        const response = await client.beta.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 16000,
+          output_config: { effort: 'medium' },
+          // If a safety classifier declines, the API retries on a suitable fallback model in the same call.
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+          system: [
+            { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: dog ? `Dog profile:\n${dogSummary(dog)}` : 'No dog profile was shared.' },
+          ],
+          messages,
+        });
+        if (response.stop_reason === 'refusal') {
+          return { text: "I can't help with that one. For anything about your dog's health, your vet is the best person to ask." };
+        }
+        const text = response.content
+          .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('\n')
+          .trim();
+        return parseVerdict(text || 'Sorry, I could not come up with an answer. Please try again.');
+      } catch (error) {
+        if (error instanceof Anthropic.AuthenticationError) throw new Error('Your Claude API key was not accepted. Check it in Profile → AI connection.');
+        if (error instanceof Anthropic.PermissionDeniedError) throw new Error('Your Claude API key does not have access to this model. Check your Anthropic account.');
+        if (error instanceof Anthropic.RateLimitError) throw new Error('Claude is busy or your account hit its limit. Try again in a minute.');
+        if (error instanceof Anthropic.BadRequestError) throw new Error(/credit|billing/i.test(error.message) ? 'Your Anthropic account is out of credit. Add credit at console.anthropic.com.' : 'Claude could not read that message or photo.');
+        if (error instanceof Anthropic.APIConnectionTimeoutError) throw new Error('Claude took too long to answer. Try again.');
+        if (error instanceof Anthropic.APIConnectionError) throw new Error('Could not reach Claude. Check your internet connection.');
+        if (error instanceof Anthropic.APIError) throw new Error(`Claude had a problem (${error.status ?? 'error'}). Try again shortly.`);
+        throw error;
+      }
+    },
+  };
 }
 
 // ---------- Proxy provider ----------
@@ -82,7 +175,7 @@ function verdictWord(v: Verdict) {
 
 export const demoProvider: AIProvider = {
   id: 'demo',
-  label: 'Demo mode (on-device)',
+  label: 'Demo mode',
   async send(history, dog) {
     await new Promise((r) => setTimeout(r, 700 + Math.random() * 600));
     const last = [...history].reverse().find((m) => m.role === 'user');
@@ -108,7 +201,7 @@ export const demoProvider: AIProvider = {
 
     if (hasPhoto) {
       return {
-        text: `Got the photo! In demo mode I can't look at pictures yet. Tell me what it is, for example "can ${name} eat blueberries?", and I'll check it against the food safety list.\n\nTo get real photo answers, connect an AI server in Profile → AI connection.`,
+        text: `Got the photo! In demo mode I can't look at pictures yet. Tell me what it is, for example "can ${name} eat blueberries?", and I'll check it against the food safety list.\n\nTo get real photo answers, connect your own AI in Profile → AI connection.`,
       };
     }
 
@@ -152,14 +245,18 @@ export const demoProvider: AIProvider = {
     }
 
     return {
-      text: `I'm in demo mode, so I can answer about food safety ("can ${name} eat grapes?"), calories, potty timing, exercise, grooming and training for ${name}'s age.\n\nFor open-ended questions and photo answers, connect an AI server in Profile → AI connection.`,
+      text: `I'm in demo mode, so I can answer about food safety ("can ${name} eat grapes?"), calories, potty timing, exercise, grooming and training for ${name}'s age.\n\nFor open-ended questions and photo answers, connect your own AI in Profile → AI connection.`,
     };
   },
 };
 
-export function getProvider(proxyUrl: string, token?: string): AIProvider {
-  const url = proxyUrl || process.env.EXPO_PUBLIC_AI_PROXY_URL || '';
-  return url ? proxyProvider(url, token) : demoProvider;
+export function getProvider(mode: AiMode, opts: { proxyUrl?: string; token?: string; claudeKey?: string | null }): AIProvider {
+  if (mode === 'claude' && opts.claudeKey) return claudeProvider(opts.claudeKey);
+  if (mode === 'server') {
+    const url = opts.proxyUrl || process.env.EXPO_PUBLIC_AI_PROXY_URL || '';
+    if (url) return proxyProvider(url, opts.token);
+  }
+  return demoProvider;
 }
 
 export function toOutgoing(chat: ChatMessage[], latestImage?: { data: string; mediaType: string }): OutgoingMessage[] {

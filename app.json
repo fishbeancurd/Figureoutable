@@ -58,7 +58,8 @@
           "color": "#FF9C74"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

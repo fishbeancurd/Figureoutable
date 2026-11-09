@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AppState, Dog, Food, LogEntry, Owner } from './types';
 import { uid, isoDate } from './util';
-import { XP_FOR, levelFromXp, streakDays, dayKey } from './dogmath';
+import { XP_FOR, computeXp, levelFromXp, snapshot, streakDays, dayKey } from './dogmath';
 import { buildRoutine } from './routine';
 import { LESSONS } from '@/data/learn';
 
@@ -38,13 +38,16 @@ export const initialState = (): AppState => ({
   checklists: {},
   milestones: {},
   chat: [],
+  aiMode: 'demo',
   aiProxyUrl: '',
   aiToken: '',
   remindersOn: true,
+  customSkills: [],
+  unlockedLevels: [],
 });
 
 export function totalXp(s: AppState): number {
-  const fromLogs = s.logs.reduce((n, l) => n + XP_FOR[l.type], 0);
+  const fromLogs = s.logs.reduce((n, l) => n + (l.xp ?? XP_FOR[l.type]), 0);
   const fromLessons = Object.values(s.lessonSteps).reduce((n, steps) => n + steps.length * 10, 0);
   const fromChecklists = Object.values(s.checklists).reduce((n, items) => n + items.length * 5, 0);
   const fromMilestones = Object.keys(s.milestones).length * 50;
@@ -75,7 +78,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(KEY);
-        if (raw) setState({ ...initialState(), ...JSON.parse(raw) });
+        if (raw) {
+          const saved = JSON.parse(raw);
+          // Older saves had only a server address: treat a saved address as "server" mode.
+          if (!saved.aiMode) saved.aiMode = saved.aiProxyUrl ? 'server' : 'demo';
+          setState({ ...initialState(), ...saved });
+        }
       } catch {
         // Corrupt or unreadable storage: start fresh rather than crash.
       }
@@ -94,15 +102,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const update = useCallback((fn: (s: AppState) => AppState) => setState((s) => fn(s)), []);
 
   const addLog: Store['addLog'] = useCallback((entry) => {
-    const before = levelFromXp(totalXp(stateRef.current)).level;
     const log: LogEntry = { ...entry, id: uid(), at: entry.at ?? new Date().toISOString() } as LogEntry;
-    const next = { ...stateRef.current, logs: [log, ...stateRef.current.logs] };
-    if (entry.type === 'weight' && entry.kg && next.dog) {
-      next.dog = { ...next.dog, weights: [...next.dog.weights.filter((w) => w.date !== isoDate(new Date(log.at))), { date: isoDate(new Date(log.at)), kg: entry.kg }] };
-    }
-    setState(next);
+    const apply = (s: AppState): AppState => {
+      const next = { ...s, logs: [log, ...s.logs] };
+      if (log.type === 'weight' && log.kg && next.dog) {
+        const d = isoDate(new Date(log.at));
+        next.dog = { ...next.dog, weights: [...next.dog.weights.filter((w) => w.date !== d), { date: d, kg: log.kg }] };
+      }
+      return next;
+    };
+    const before = levelFromXp(totalXp(stateRef.current)).level;
+    const next = apply(stateRef.current);
+    stateRef.current = next; // keeps rapid back-to-back logs from overwriting each other
+    setState(apply);
     const after = levelFromXp(totalXp(next)).level;
-    return { xp: XP_FOR[entry.type], leveledUp: after > before };
+    return { xp: log.xp ?? XP_FOR[log.type], leveledUp: after > before };
   }, []);
 
   const reset = useCallback(() => {
@@ -194,7 +208,7 @@ export function sampleState(): AppState {
     if (day === 9) logs.push({ id: uid(), type: 'treat', at: at(day, 15), foodId: chicken.id, foodName: chicken.name, amount: 20, kcal: 32, liking: 'loves', reaction: 'allergy', note: 'Scratching paws the next morning' });
     if (8 <= hoursLimit) logs.push({ id: uid(), type: 'walk', at: at(day, 8), minutes: 12 + Math.floor(rnd(day) * 8) });
     if (18 <= hoursLimit) logs.push({ id: uid(), type: 'walk', at: at(day, 18), minutes: 15 + Math.floor(rnd(day + 50) * 10) });
-    if (10 <= hoursLimit) logs.push({ id: uid(), type: 'training', at: at(day, 10), minutes: 5, skill: ['Sit', 'Name game', 'Come when called', 'Down'][day % 4] });
+    if (10 <= hoursLimit) logs.push({ id: uid(), type: 'training', at: at(day, 10), minutes: 5, skill: ['Sit', 'Name game', 'Come when called', 'Down'][day % 4], rating: day % 3 === 0 ? 'nailed' : day % 3 === 1 ? 'okay' : 'struggled' });
     if (20 <= hoursLimit && day % 2 === 0) logs.push({ id: uid(), type: 'play', at: at(day, 20), minutes: 15 });
     for (let p = 0; p < 6; p++) {
       const t = 7 + p * 2.5;
@@ -213,6 +227,10 @@ export function sampleState(): AppState {
   });
   dog.weights = weights;
   weights.forEach((w) => logs.push({ id: uid(), type: 'weight', at: new Date(w.date + 'T09:00:00').toISOString(), kg: w.kg }));
+
+  // Give the sample logs the same effort-based XP that real logs earn.
+  const cal = snapshot(dog, now).cal;
+  for (const l of logs) l.xp = computeXp(l, { perMeal: cal.perMeal, treatBudgetLeft: cal.treatBudget }).xp;
 
   const routine = buildRoutine(dog, owner);
   const todayKey = dayKey(now);

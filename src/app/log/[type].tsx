@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { C, Tint } from '@/constants/theme';
+import { C, F, Tint } from '@/constants/theme';
 import { Badge, Button, Card, Chip, Field, Row, Segmented, Stepper, T } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { useCelebrate } from '@/components/Celebrate';
 import { totalXp, useStore } from '@/lib/store';
-import type { Food, GroomTask, Liking, LogEntry, LogType, Reaction, TreatValue } from '@/lib/types';
+import type { Food, GroomTask, Liking, LogEntry, LogType, Reaction, TrainingRating, TreatValue } from '@/lib/types';
+import { allSkills, levelUnlocked, skillLevelOf, skillMastery } from '@/lib/skills';
 import { LOG_META } from '@/data/logMeta';
-import { XP_FOR, ageWeeks, expectedWeightKg, latestWeightKg, levelFromXp, logsOn, snapshot, sumKcal } from '@/lib/dogmath';
+import { GROOM_XP, computeXp, ageWeeks, expectedWeightKg, latestWeightKg, levelFromXp, logsOn, snapshot, sumKcal } from '@/lib/dogmath';
 import { pottyGuide } from '@/data/stages';
-import { GROOM_BY_COAT, LESSONS } from '@/data/learn';
+import { GROOM_BY_COAT, LEVEL_INFO } from '@/data/learn';
 import { findBreed } from '@/data/breeds';
 import { findFoodFacts } from '@/data/foodSafety';
 
@@ -39,7 +40,7 @@ const GROOM: { value: GroomTask; label: string }[] = [
 ];
 
 export default function LogScreen() {
-  const { type: rawType } = useLocalSearchParams<{ type: string }>();
+  const { type: rawType, groom: groomParam, skill: skillParam } = useLocalSearchParams<{ type: string; groom?: string; skill?: string }>();
   const type = (rawType in LOG_META ? rawType : 'meal') as LogType;
   const meta = LOG_META[type];
   const { state, update, addLog } = useStore();
@@ -55,11 +56,13 @@ export default function LogScreen() {
   const [treatValue, setTreatValue] = useState<TreatValue>(food?.treatValue ?? 'medium');
   const [reaction, setReaction] = useState<Reaction>('none');
   const [minutes, setMinutes] = useState(type === 'training' ? 5 : type === 'sleep' ? 60 : 20);
-  const [skill, setSkill] = useState(LESSONS[0].title);
+  const skills = allSkills(state).filter((k) => k.custom || levelUnlocked(state, k.level));
+  const [skill, setSkill] = useState(skillParam && skills.some((k) => k.name === skillParam) ? skillParam : (skills[0]?.name ?? 'Practice'));
+  const [rating, setRating] = useState<TrainingRating>('okay');
   const [potty, setPotty] = useState<'pee' | 'poo' | 'both'>('pee');
   const [accident, setAccident] = useState(false);
   const [stool, setStool] = useState<'firm' | 'soft' | 'runny'>('firm');
-  const [groom, setGroom] = useState<GroomTask>('brush');
+  const [groom, setGroom] = useState<GroomTask>(groomParam && groomParam in GROOM_XP ? (groomParam as GroomTask) : 'brush');
   const [symptom, setSymptom] = useState('');
   const [kg, setKg] = useState(latestWeightKg(dog) ?? +expectedWeightKg(dog, ageWeeks(dog.birthDate)).toFixed(1));
   const [note, setNote] = useState('');
@@ -78,8 +81,13 @@ export default function LogScreen() {
     setAmount(f.unit === 'cup' ? 0.5 : f.unit === 'g' ? 20 : 5);
   };
 
+  const xpPreview = computeXp(
+    { type, minutes, kcal, accident, groom, rating },
+    { perMeal: snap.cal.perMeal, treatBudgetLeft: Math.max(0, snap.cal.treatBudget - todayTreat), skillLevel: skillLevelOf(state, skill) },
+  );
+
   const save = () => {
-    const at = new Date(Date.now() - whenMin * 60000).toISOString();
+    const at = new Date(new Date().getTime() - whenMin * 60000).toISOString();
     let entry: Omit<LogEntry, 'id' | 'at'>;
     switch (type) {
       case 'meal':
@@ -102,7 +110,7 @@ export default function LogScreen() {
         entry = { type, minutes };
         break;
       case 'training':
-        entry = { type, minutes, skill };
+        entry = { type, minutes, skill, rating };
         break;
       case 'potty':
         entry = { type, potty, accident, stool: potty !== 'pee' ? stool : undefined };
@@ -118,7 +126,7 @@ export default function LogScreen() {
         break;
     }
     const before = levelFromXp(totalXp(state)).level;
-    const { xp, leveledUp } = addLog({ ...entry, note: note.trim() || undefined, at });
+    const { xp, leveledUp } = addLog({ ...entry, xp: xpPreview.xp, note: note.trim() || undefined, at });
     celebrate({
       xp,
       title: type === 'potty' && accident ? 'Logged. Accidents happen!' : `${meta.label} logged`,
@@ -134,13 +142,13 @@ export default function LogScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <View style={styles.head}>
           <View style={[styles.headIcon, { backgroundColor: Tint[meta.tint][0] }]}>
             <Icon name={meta.icon} size={24} color={Tint[meta.tint][1]} />
           </View>
           <T v="h1" style={{ flex: 1 }}>
-            Log {meta.label.toLowerCase()}
+            Log {type === 'training' ? 'training' : meta.label.toLowerCase()}
           </T>
           <Button label="Close" kind="ghost" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         </View>
@@ -206,12 +214,24 @@ export default function LogScreen() {
             <>
               {type === 'training' && (
                 <View style={{ gap: 8 }}>
-                  <T v="label">What did you practice?</T>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <T v="label">What did you practice?</T>
+                    <Button label="My skills" kind="ghost" icon="medal" onPress={() => router.push('/skills')} style={{ transform: [{ scale: 0.85 }] }} />
+                  </Row>
                   <Row gap={8} style={{ flexWrap: 'wrap' }}>
-                    {LESSONS.filter((l) => l.cat === 'training' || l.cat === 'behavior' || l.cat === 'exercise').map((l) => (
-                      <Chip key={l.id} label={l.title} active={skill === l.title} onPress={() => setSkill(l.title)} tint="lavender" />
+                    {skills.map((k) => (
+                      <Chip key={k.key} label={k.custom ? `★ ${k.name}` : k.name} active={skill === k.name} onPress={() => setSkill(k.name)} tint={LEVEL_INFO[k.level].tint} />
                     ))}
                   </Row>
+                </View>
+              )}
+              {type === 'training' && (
+                <View style={{ gap: 6 }}>
+                  <T v="label">How did it go?</T>
+                  <Segmented options={[{ value: 'struggled', label: 'Tricky' }, { value: 'okay', label: 'Getting there' }, { value: 'nailed', label: 'Nailed it!' }]} value={rating} onChange={setRating} />
+                  <T v="small">
+                    {skill}: {LEVEL_INFO[skillLevelOf(state, skill)].label} · {skillMastery(state.logs, skill).label}
+                  </T>
                 </View>
               )}
               <Card style={{ alignItems: 'center', gap: 12 }}>
@@ -261,7 +281,7 @@ export default function LogScreen() {
             <>
               <Row gap={8} style={{ flexWrap: 'wrap' }}>
                 {GROOM.map((g) => (
-                  <Chip key={g.value} label={g.label} active={groom === g.value} onPress={() => setGroom(g.value)} tint="sky" />
+                  <Chip key={g.value} label={`${g.label} · ${GROOM_XP[g.value]} XP`} active={groom === g.value} onPress={() => setGroom(g.value)} tint="sky" />
                 ))}
               </Row>
               <Card tint="sky" style={{ gap: 4 }}>
@@ -307,7 +327,17 @@ export default function LogScreen() {
             </Row>
           </View>
           <Field label="Note (optional)" value={note} onChangeText={setNote} placeholder="Anything worth remembering" />
-          <Button label={`Save · +${XP_FOR[type]} XP`} icon="check" onPress={save} disabled={(type === 'meal' || type === 'treat') && !food} />
+          <View style={styles.xpBox}>
+            <T v="small" style={{ color: C.ink, flex: 1 }}>
+              {xpPreview.parts.join('  ·  ')}
+            </T>
+            <Pressable onPress={() => router.push('/xp')} hitSlop={8} accessibilityRole="link">
+              <T v="small" style={{ color: C.lavenderDeep, fontFamily: F.bodyHeavy }}>
+                How XP works
+              </T>
+            </Pressable>
+          </View>
+          <Button label={`Save · +${xpPreview.xp} XP`} icon="check" onPress={save} disabled={(type === 'meal' || type === 'treat') && !food} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -317,4 +347,5 @@ export default function LogScreen() {
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 4 },
   headIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  xpBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.peach, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
 });

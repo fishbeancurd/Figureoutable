@@ -8,7 +8,8 @@ import { Icon } from '@/components/Icon';
 import { Mascot } from '@/components/Mascot';
 import { useCelebrate } from '@/components/Celebrate';
 import { useStore } from '@/lib/store';
-import { CATEGORY_INFO, LESSONS } from '@/data/learn';
+import { CATEGORY_INFO, LESSONS, LEVEL_INFO } from '@/data/learn';
+import { SKILL_LESSONS, completedIn, levelUnlocked, skillMastery } from '@/lib/skills';
 
 export default function LessonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,7 +20,12 @@ export default function LessonScreen() {
   const tint = CATEGORY_INFO[lesson.cat].tint;
   const complete = done.length >= lesson.steps.length;
 
+  const open = levelUnlocked(state, lesson.level);
+  const info = LEVEL_INFO[lesson.level];
+  const mastery = skillMastery(state.logs, lesson.title);
+
   const toggle = (i: number) => {
+    if (!open) return;
     const has = done.includes(i);
     const next = has ? done.filter((x) => x !== i) : [...done, i];
     update((s) => ({ ...s, lessonSteps: { ...s.lessonSteps, [lesson.id]: next } }));
@@ -28,7 +34,8 @@ export default function LessonScreen() {
     }
   };
 
-  const logType = lesson.cat === 'potty' ? 'potty' : lesson.cat === 'grooming' ? 'grooming' : lesson.cat === 'exercise' ? 'walk' : 'training';
+  const isSkill = SKILL_LESSONS.some((l) => l.id === lesson.id);
+  const logType = isSkill ? 'training' : lesson.cat === 'potty' ? 'potty' : lesson.cat === 'grooming' ? 'grooming' : 'training';
 
   return (
     <Screen tabs={false} header={<TopBar title={CATEGORY_INFO[lesson.cat].label} />}>
@@ -43,7 +50,30 @@ export default function LessonScreen() {
         </Animated.View>
       </View>
 
-      <Row gap={12}>
+      <Row gap={8}>
+        <Badge text={info.label} tint={info.tint} />
+        <Badge text={`${'★'.repeat(mastery.stars) || '☆'} ${mastery.label} · ${mastery.sessions} sessions`} light />
+      </Row>
+
+      {!open && info.needs && (
+        <Card tint={info.tint} style={{ gap: 8 }}>
+          <T v="h3">This is a {info.label.toLowerCase()} skill</T>
+          <T>
+            It unlocks after {info.needCount} {LEVEL_INFO[info.needs].label.toLowerCase()} lessons ({Math.min(completedIn(state, info.needs), info.needCount)}/{info.needCount} done). If {state.dog?.name} picks things up quickly, you can unlock it now.
+          </T>
+          <Button
+            label={`Unlock ${info.label.toLowerCase()} skills`}
+            kind="dark"
+            icon="star"
+            onPress={() => {
+              update((s) => ({ ...s, unlockedLevels: [...new Set([...s.unlockedLevels, lesson.level])] }));
+              celebrate({ xp: 0, title: `${info.label} skills unlocked` });
+            }}
+          />
+        </Card>
+      )}
+
+      <Row gap={12} style={{ opacity: open ? 1 : 0.5 }}>
         <View style={{ flex: 1 }}>
           <ProgressBar value={done.length / lesson.steps.length} color={Tint[tint][1]} track={C.paper} />
         </View>
@@ -83,7 +113,13 @@ export default function LessonScreen() {
         </Card>
       )}
 
-      <Button label="Log a practice session" icon="medal" onPress={() => router.push({ pathname: '/log/[type]', params: { type: logType } })} />
+      {open && (
+        <Button
+          label="Log a practice session"
+          icon="medal"
+          onPress={() => router.push({ pathname: '/log/[type]', params: isSkill ? { type: logType, skill: lesson.title } : { type: logType } })}
+        />
+      )}
     </Screen>
   );
 }

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { C, R, Tint } from '@/constants/theme';
-import { Badge, Button, Card, Chip, Row, Screen, Segmented, SectionTitle, T } from '@/components/ui';
+import { Badge, Button, Card, Chip, Press, Row, Screen, Segmented, SectionTitle, T } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { BarChart, GrowthChart, HourDots } from '@/components/Charts';
 import { useStore } from '@/lib/store';
@@ -188,22 +188,30 @@ export default function Track() {
 
       {/* Grooming */}
       <Card style={{ gap: 10 }}>
-        <T v="h2">Grooming</T>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <T v="h2">Grooming</T>
+          <T v="small">Tap a task to log it</T>
+        </Row>
         <Row gap={8} style={{ flexWrap: 'wrap' }}>
           {(Object.keys(GROOM_DUE) as GroomTask[]).map((g) => {
             const last = lastGroom[g];
             const daysAgo = last ? Math.floor((nowMs - new Date(last).getTime()) / 86400000) : null;
             const due = daysAgo === null || daysAgo >= GROOM_DUE[g].every;
             return (
-              <View key={g} style={[styles.groom, { backgroundColor: due ? C.rose : C.sky }]}>
-                <T v="bodyStrong" style={{ fontSize: 13 }}>
-                  {GROOM_DUE[g].label}
-                </T>
-                <T v="small" style={{ color: C.ink }}>
-                  {daysAgo === null ? 'Not yet' : daysAgo === 0 ? 'Today' : `${daysAgo}d ago`}
-                  {due ? ' · due' : ''}
-                </T>
-              </View>
+              <Press key={g} onPress={() => router.push({ pathname: '/log/[type]', params: { type: 'grooming', groom: g } })} accessibilityLabel={`Log ${GROOM_DUE[g].label}`}>
+                <View style={[styles.groom, { backgroundColor: due ? C.rose : C.sky }]}>
+                  <Row gap={6}>
+                    <T v="bodyStrong" style={{ fontSize: 13 }}>
+                      {GROOM_DUE[g].label}
+                    </T>
+                    <Icon name="plus" size={13} color={C.ink} strokeWidth={2.6} />
+                  </Row>
+                  <T v="small" style={{ color: C.ink }}>
+                    {daysAgo === null ? 'Not yet' : daysAgo === 0 ? 'Today' : `${daysAgo}d ago`}
+                    {due ? ' · due' : ''}
+                  </T>
+                </View>
+              </Press>
             );
           })}
         </Row>

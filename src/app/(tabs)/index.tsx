@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -78,6 +78,7 @@ export default function Home() {
 
       {/* Level hero */}
       <Animated.View entering={FadeInDown.duration(500)}>
+        <Press onPress={() => router.push('/xp')} accessibilityLabel="How XP works">
         <LinearGradient colors={['#B9A8F2', '#9C88EC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={[styles.heroBlob, { right: -40, top: -50, backgroundColor: 'rgba(255,255,255,0.14)' }]} />
           <View style={[styles.heroBlob, { left: -30, bottom: -70, width: 160, height: 160, backgroundColor: 'rgba(255,220,203,0.25)' }]} />
@@ -93,19 +94,25 @@ export default function Home() {
             <T v="small" style={{ color: 'rgba(255,255,255,0.9)' }}>
               {game.into} / {game.need} XP to level {game.level + 1}
             </T>
+            <T v="small" style={{ color: '#fff', fontFamily: F.bodyHeavy, marginTop: -4 }}>
+              How XP works ›
+            </T>
           </View>
           <DogAvatar dog={dog} size={118} />
         </LinearGradient>
+        </Press>
       </Animated.View>
 
       {/* Quick log */}
       <View style={{ gap: 10 }}>
         <SectionTitle title="Log something" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4, paddingRight: 10 }} style={{ marginHorizontal: -6 }}>
+        <View style={styles.grid}>
           {QUICK_LOGS.map((t) => (
-            <IconBubble key={t} icon={LOG_META[t].icon} tint={LOG_META[t].tint} label={LOG_META[t].label} onPress={() => router.push({ pathname: '/log/[type]', params: { type: t } })} />
+            <View key={t} style={styles.gridCell}>
+              <IconBubble icon={LOG_META[t].icon} tint={LOG_META[t].tint} size={50} label={LOG_META[t].label} onPress={() => router.push({ pathname: '/log/[type]', params: { type: t } })} />
+            </View>
           ))}
-        </ScrollView>
+        </View>
       </View>
 
       {/* Today */}
@@ -271,5 +278,7 @@ const styles = StyleSheet.create({
   tipIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
   stageDot: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
   stageLine: { flex: 1, height: 3, borderRadius: 2, marginTop: -18 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
+  gridCell: { width: '20%', alignItems: 'center' },
   logIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 });

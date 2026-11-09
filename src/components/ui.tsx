@@ -14,7 +14,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTabBarSpace } from '@/hooks/useTabBarSpace';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   Easing,
@@ -26,7 +27,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { C, F, R, TAB_BAR_SPACE, Tint, shadow, type TintName } from '@/constants/theme';
+import { C, F, R, Tint, shadow, type TintName } from '@/constants/theme';
 import { Icon, type IconName } from './Icon';
 import { Mascot, type Mood } from './Mascot';
 import type { Dog } from '@/lib/types';
@@ -65,12 +66,14 @@ export function Screen({
   style?: StyleProp<ViewStyle>;
   header?: React.ReactNode;
 }) {
+  const tabSpace = useTabBarSpace();
+  const insets = useSafeAreaInsets();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top']}>
       {header}
       {scroll ? (
         <ScrollView
-          contentContainerStyle={[{ paddingHorizontal: 18, paddingTop: 6, paddingBottom: tabs ? TAB_BAR_SPACE : 40, gap: 16 }, style]}
+          contentContainerStyle={[{ paddingHorizontal: 18, paddingTop: 6, paddingBottom: tabs ? tabSpace + 36 : 40 + insets.bottom, gap: 16 }, style]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled">
           {children}

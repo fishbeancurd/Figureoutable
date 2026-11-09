@@ -8,7 +8,8 @@ import { Icon } from '@/components/Icon';
 import { Mascot } from '@/components/Mascot';
 import { useStore } from '@/lib/store';
 import { snapshot } from '@/lib/dogmath';
-import { CATEGORY_INFO, CHECKLISTS, LESSONS, tipsFor, type TipCategory } from '@/data/learn';
+import { CATEGORY_INFO, CHECKLISTS, LESSONS, LEVEL_INFO, LEVELS, tipsFor, type TipCategory } from '@/data/learn';
+import { allSkills, completedIn, lessonComplete, levelUnlocked, nextLockedLevel, skillMastery } from '@/lib/skills';
 import { pottyGuide } from '@/data/stages';
 
 const FILTERS: (TipCategory | 'all')[] = ['all', 'training', 'potty', 'feeding', 'grooming', 'health', 'social', 'exercise', 'behavior', 'sleep'];
@@ -21,6 +22,8 @@ export default function Learn() {
   const [open, setOpen] = useState<string | null>(null);
 
   const lessons = LESSONS.filter((l) => cat === 'all' || l.cat === cat);
+  const skillList = allSkills(state);
+  const nextLocked = nextLockedLevel(state);
   const tips = tipsFor(snap.stage.id, cat === 'all' ? undefined : cat);
   const potty = pottyGuide(snap.weeks, snap.stage.id);
 
@@ -60,42 +63,92 @@ export default function Learn() {
         <View style={{ width: 10 }} />
       </ScrollView>
 
-      {/* Lessons */}
-      {lessons.length > 0 && <SectionTitle title="Lessons" />}
-      {lessons.map((l, i) => {
-        const tint = CATEGORY_INFO[l.cat].tint;
-        const done = (state.lessonSteps[l.id] ?? []).length;
-        const locked = l.minWeeks > snap.weeks;
+      {/* Skills */}
+      <Card style={{ gap: 10 }} onPress={() => router.push('/skills')}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Row gap={10}>
+            <View style={[styles.tipDot, { backgroundColor: C.butter, width: 42, height: 42, borderRadius: 21 }]}>
+              <Icon name="star" size={20} color={C.butterDeep} fill={C.butterDeep} />
+            </View>
+            <View>
+              <T v="h3">{dog.name}'s skills</T>
+              <T v="small">
+                {skillList.filter((k) => skillMastery(state.logs, k.name).stars >= 3).length} reliable · {skillList.length} on the list
+              </T>
+            </View>
+          </Row>
+          <Icon name="chevron" size={20} color={C.inkSoft} />
+        </Row>
+        {nextLocked ? (
+          <>
+            <T v="small" style={{ color: C.ink }}>
+              Finish {LEVEL_INFO[nextLocked].needCount} {LEVEL_INFO[LEVEL_INFO[nextLocked].needs!].label.toLowerCase()} lessons to unlock {LEVEL_INFO[nextLocked].label.toLowerCase()} skills, or unlock them early for a fast learner.
+            </T>
+            <ProgressBar value={completedIn(state, LEVEL_INFO[nextLocked].needs!) / LEVEL_INFO[nextLocked].needCount} color={Tint[LEVEL_INFO[nextLocked].tint][1]} track={C.bg} height={8} />
+          </>
+        ) : (
+          <T v="small" style={{ color: C.ink }}>All levels unlocked. Add your own skills for anything not on the list.</T>
+        )}
+      </Card>
+
+      {/* Lessons by level */}
+      {LEVELS.map((lv) => {
+        const list = lessons.filter((l) => l.level === lv);
+        if (!list.length) return null;
+        const open = levelUnlocked(state, lv);
         return (
-          <Animated.View key={l.id} entering={FadeInDown.delay(i * 40)}>
-            <Press onPress={() => router.push({ pathname: '/lesson/[id]', params: { id: l.id } })} accessibilityLabel={l.title}>
-              <View style={[styles.lesson, { backgroundColor: Tint[tint][0] }]}>
-                <View style={[styles.blob, { backgroundColor: 'rgba(255,255,255,0.35)' }]} />
-                <View style={{ flex: 1, gap: 4 }}>
-                  <T v="label" style={{ color: Tint[tint][1] }}>
-                    {CATEGORY_INFO[l.cat].label} · {l.minutes}
-                  </T>
-                  <T v="h2">{l.title}</T>
-                  <T v="small" style={{ color: C.ink }} numberOfLines={2}>
-                    {l.summary}
-                  </T>
-                  {locked ? (
-                    <Row gap={6} style={{ marginTop: 4 }}>
-                      <Icon name="lock" size={14} color={C.inkSoft} />
-                      <T v="small">Best from {l.minWeeks} weeks</T>
-                    </Row>
-                  ) : (
-                    <View style={[styles.startPill, { backgroundColor: done ? C.paper : Tint[tint][1] }]}>
-                      <T v="bodyStrong" style={{ fontSize: 13, color: done ? C.ink : '#fff' }}>
-                        {done === 0 ? 'Start' : done >= l.steps.length ? 'Review' : 'Continue'}
-                      </T>
+          <View key={lv} style={{ gap: 12 }}>
+            <Row style={{ justifyContent: 'space-between', marginTop: 4 }}>
+              <Row gap={8}>
+                <T v="h2">{LEVEL_INFO[lv].label}</T>
+                {!open && <Icon name="lock" size={16} color={C.inkSoft} />}
+              </Row>
+              <T v="small">
+                {list.filter((l) => lessonComplete(state, l.id)).length}/{list.length} done
+              </T>
+            </Row>
+            {list.map((l, i) => {
+              const tint = CATEGORY_INFO[l.cat].tint;
+              const done = (state.lessonSteps[l.id] ?? []).length;
+              const young = l.minWeeks > snap.weeks;
+              return (
+                <Animated.View key={l.id} entering={FadeInDown.delay(i * 40)} style={{ opacity: open ? 1 : 0.6 }}>
+                  <Press onPress={() => router.push({ pathname: '/lesson/[id]', params: { id: l.id } })} accessibilityLabel={l.title}>
+                    <View style={[styles.lesson, { backgroundColor: Tint[tint][0] }]}>
+                      <View style={[styles.blob, { backgroundColor: 'rgba(255,255,255,0.35)' }]} />
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <T v="label" style={{ color: C.inkSoft }}>
+                          {CATEGORY_INFO[l.cat].label} · {l.minutes}
+                        </T>
+                        <T v="h2">{l.title}</T>
+                        <T v="small" style={{ color: C.ink }} numberOfLines={2}>
+                          {l.summary}
+                        </T>
+                        {!open ? (
+                          <Row gap={6} style={{ marginTop: 4 }}>
+                            <Icon name="lock" size={14} color={C.inkSoft} />
+                            <T v="small">Unlocks with the {LEVEL_INFO[lv].label.toLowerCase()} level</T>
+                          </Row>
+                        ) : young ? (
+                          <Row gap={6} style={{ marginTop: 4 }}>
+                            <Icon name="clock" size={14} color={C.inkSoft} />
+                            <T v="small">Best from {l.minWeeks} weeks</T>
+                          </Row>
+                        ) : (
+                          <View style={[styles.startPill, { backgroundColor: done ? C.paper : C.pill }]}>
+                            <T v="bodyStrong" style={{ fontSize: 13, color: done ? C.ink : '#fff' }}>
+                              {done === 0 ? 'Start' : done >= l.steps.length ? 'Review' : 'Continue'}
+                            </T>
+                          </View>
+                        )}
+                      </View>
+                      <CountBadge done={done} total={l.steps.length} />
                     </View>
-                  )}
-                </View>
-                <CountBadge done={done} total={l.steps.length} />
-              </View>
-            </Press>
-          </Animated.View>
+                  </Press>
+                </Animated.View>
+              );
+            })}
+          </View>
         );
       })}
 

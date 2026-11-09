@@ -89,7 +89,25 @@ export interface LogEntry {
   // weight
   kg?: number;
   note?: string;
+  // training
+  rating?: TrainingRating;
+  // XP earned when logged (older entries fall back to a default)
+  xp?: number;
 }
+
+export type TrainingRating = 'struggled' | 'okay' | 'nailed';
+export type SkillLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export interface CustomSkill {
+  id: string;
+  name: string;
+  cue?: string;
+  notes?: string;
+  level: SkillLevel;
+  createdAt: string;
+}
+
+export type AiMode = 'demo' | 'claude' | 'server';
 
 export type GroomTask = 'brush' | 'bath' | 'nails' | 'teeth' | 'ears' | 'eyes';
 
@@ -126,7 +144,10 @@ export interface AppState {
   checklists: Record<string, string[]>; // checklistId -> done item ids
   milestones: Record<string, string>; // milestoneId -> ISO date achieved
   chat: ChatMessage[];
+  aiMode: AiMode;
   aiProxyUrl: string;
   aiToken: string;
   remindersOn: boolean;
+  customSkills: CustomSkill[];
+  unlockedLevels: SkillLevel[]; // training levels unlocked early by the owner
 }

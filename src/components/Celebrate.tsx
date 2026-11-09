@@ -72,7 +72,7 @@ function Burst({ c, onDone }: { c: Celebration; onDone: () => void }) {
         <View style={[styles.toast, shadow]}>
           <Mascot size={58} mood="cheer" cheerKey={c.key} />
           <View style={{ flexShrink: 1 }}>
-            <Text style={styles.xp}>+{c.xp} XP</Text>
+            {c.xp > 0 ? <Text style={styles.xp}>+{c.xp} XP</Text> : null}
             <Text style={styles.title}>{c.title}</Text>
             {c.levelUp ? <Text style={styles.level}>{c.levelUp}</Text> : null}
           </View>

@@ -1,4 +1,4 @@
-import type { Dog, LogEntry, SizeClass } from './types';
+import type { Dog, GroomTask, LogEntry, SizeClass, SkillLevel } from './types';
 import { ADULT_AT_WEEKS, exerciseTargetMinutes, mealsPerDay, stageFor, type Stage } from '@/data/stages';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -148,6 +148,7 @@ export function snapshot(dog: Dog, now = new Date()): DogSnapshot {
 
 // ---------- Gamification ----------
 
+/** Fallback for entries saved before XP depended on effort. */
 export const XP_FOR: Record<LogEntry['type'], number> = {
   meal: 10,
   treat: 5,
@@ -155,11 +156,87 @@ export const XP_FOR: Record<LogEntry['type'], number> = {
   play: 15,
   training: 25,
   potty: 10,
-  grooming: 20,
+  grooming: 15,
   sleep: 5,
   health: 10,
   weight: 15,
 };
+
+export const GROOM_XP: Record<GroomTask, number> = { teeth: 10, brush: 15, ears: 10, eyes: 5, nails: 25, bath: 25 };
+const LEVEL_MULT: Record<SkillLevel, number> = { beginner: 1, intermediate: 1.25, advanced: 1.5 };
+
+export interface XpContext {
+  perMeal: number;
+  treatBudgetLeft: number; // kcal left in today's treat budget before this entry
+  skillLevel?: SkillLevel;
+}
+
+export interface XpResult {
+  xp: number;
+  parts: string[]; // short plain-language breakdown
+}
+
+/**
+ * XP rewards effort and good habits, not just tapping a button:
+ * longer walks and training sessions earn more, right-sized meals and treats within budget earn a bonus,
+ * harder skills and successful sessions earn more, and tougher grooming jobs are worth more.
+ */
+export function computeXp(e: Pick<LogEntry, 'type' | 'minutes' | 'kcal' | 'accident' | 'groom' | 'rating'>, ctx: XpContext): XpResult {
+  const parts: string[] = [];
+  let xp = 0;
+  const add = (n: number, why: string) => {
+    if (n <= 0) return;
+    xp += n;
+    parts.push(`+${n} ${why}`);
+  };
+  switch (e.type) {
+    case 'meal': {
+      add(10, 'meal logged');
+      const k = e.kcal ?? 0;
+      if (ctx.perMeal && k >= ctx.perMeal * 0.8 && k <= ctx.perMeal * 1.2) add(5, 'right-sized portion');
+      break;
+    }
+    case 'treat':
+      add(3, 'treat logged');
+      if ((e.kcal ?? 0) <= ctx.treatBudgetLeft) add(2, 'within treat budget');
+      break;
+    case 'walk':
+    case 'play': {
+      const m = e.minutes ?? 0;
+      add(5, e.type === 'walk' ? 'walk' : 'play');
+      add(Math.min(40, Math.floor(m / 2)), `for ${m} min`);
+      break;
+    }
+    case 'training': {
+      const m = e.minutes ?? 0;
+      const level = ctx.skillLevel ?? 'beginner';
+      const base = 10 + Math.min(30, m * 2);
+      const scaled = Math.round(base * LEVEL_MULT[level]);
+      add(10, 'training');
+      add(Math.min(30, m * 2), `for ${m} min`);
+      if (scaled > base) add(scaled - base, `${level} skill`);
+      if (e.rating === 'nailed') add(10, 'nailed it');
+      break;
+    }
+    case 'potty':
+      if (e.accident) add(5, 'honest logging');
+      else add(15, 'potty outside');
+      break;
+    case 'grooming':
+      add(GROOM_XP[e.groom ?? 'brush'], e.groom === 'nails' || e.groom === 'bath' ? 'tough grooming job' : 'grooming');
+      break;
+    case 'sleep':
+      add(5, 'sleep logged');
+      break;
+    case 'health':
+      add(10, 'health note');
+      break;
+    case 'weight':
+      add(15, 'weigh-in');
+      break;
+  }
+  return { xp, parts };
+}
 
 export function levelFromXp(xp: number) {
   // Each level needs more XP than the last: 250, 400, 550, ...

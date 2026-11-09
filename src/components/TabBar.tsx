@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_BAR_HEIGHT, useKeyboardVisible, useTabBarBottom } from '@/hooks/useTabBarSpace';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming, Easing } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
@@ -57,9 +57,12 @@ function AskButton({ focused, onPress }: { focused: boolean; onPress: () => void
 
 /** Floating dark pill navigation with a raised camera button for the Ask chat. */
 export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
-  const insets = useSafeAreaInsets();
+  const bottom = useTabBarBottom();
+  const keyboard = useKeyboardVisible();
+  // Get out of the way while typing so the message box stays visible.
+  if (keyboard) return null;
   return (
-    <View pointerEvents="box-none" style={[styles.outer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+    <View pointerEvents="box-none" style={[styles.outer, { paddingBottom: bottom }]}>
       <View style={styles.pill}>
         {state.routes.map((route, i) => {
           const focused = state.index === i;
@@ -84,7 +87,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: C.pill,
     borderRadius: 34,
-    height: 68,
+    height: TAB_BAR_HEIGHT,
     paddingHorizontal: 10,
     width: '100%',
     maxWidth: 420,

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Platform, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { C, F, R } from '@/constants/theme';
@@ -8,7 +8,7 @@ import { FUR_COLORS } from '@/components/Mascot';
 import { useGame, useStore } from '@/lib/store';
 import { ageLabel, levelTitle, snapshot } from '@/lib/dogmath';
 import { BREEDS, findBreed } from '@/data/breeds';
-import { proxyProvider } from '@/lib/ai';
+import { Icon } from '@/components/Icon';
 import type { AppState, Dog } from '@/lib/types';
 
 export default function Profile() {
@@ -20,9 +20,6 @@ export default function Profile() {
   const [birthText, setBirthText] = useState(dog.birthDate);
   const [breedQuery, setBreedQuery] = useState('');
   const [allergy, setAllergy] = useState('');
-  const [proxy, setProxy] = useState(state.aiProxyUrl);
-  const [token, setToken] = useState(state.aiToken);
-  const [aiStatus, setAiStatus] = useState('');
   const [importText, setImportText] = useState('');
   const [importMsg, setImportMsg] = useState('');
   const [confirmReset, setConfirmReset] = useState(false);
@@ -43,22 +40,6 @@ export default function Profile() {
     if (!perm.granted) return;
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.6 });
     if (!res.canceled && res.assets[0]) setDraft({ ...draft, photoUri: res.assets[0].uri });
-  };
-
-  const testAi = async () => {
-    const url = proxy.trim();
-    update((s) => ({ ...s, aiProxyUrl: url, aiToken: token.trim() }));
-    if (!url) {
-      setAiStatus('Demo mode is on. Answers come from built-in guides.');
-      return;
-    }
-    setAiStatus('Testing…');
-    try {
-      const r = await proxyProvider(url, token.trim()).send([{ role: 'user', text: 'Reply with one short friendly sentence to confirm you are connected.' }], dog);
-      setAiStatus(`Connected: "${r.text.slice(0, 80)}"`);
-    } catch (e: any) {
-      setAiStatus(e?.message ?? 'Could not connect.');
-    }
   };
 
   const exportData = async () => {
@@ -157,14 +138,12 @@ export default function Profile() {
 
       {/* AI */}
       <SectionTitle title="AI connection" />
-      <Card style={{ gap: 12 }}>
-        <T>
-          Leave the address empty for demo mode. To get photo understanding and open answers, run the small server in the project's <T v="bodyStrong">server</T> folder with your AI key and paste its address here.
-        </T>
-        <Field label="Server address" value={proxy} onChangeText={setProxy} placeholder="http://192.168.1.20:8787" autoCapitalize="none" autoCorrect={false} keyboardType={Platform.OS === 'ios' ? 'url' : 'default'} />
-        <Field label="Access code (optional)" value={token} onChangeText={setToken} placeholder="Matches APP_TOKEN on the server" autoCapitalize="none" secureTextEntry />
-        <Button label="Save and test" icon="spark" kind="dark" onPress={testAi} />
-        {aiStatus ? <T v="small">{aiStatus}</T> : null}
+      <Card style={{ gap: 6 }} onPress={() => router.push('/ai')}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <T v="bodyStrong">{state.aiMode === 'claude' ? 'My Claude account' : state.aiMode === 'server' ? 'My own server' : 'Demo mode'}</T>
+          <Icon name="chevron" size={18} color={C.inkSoft} />
+        </Row>
+        <T v="small">Connect your own Claude account so the chat can read photos and answer anything.</T>
       </Card>
 
       {/* Data */}

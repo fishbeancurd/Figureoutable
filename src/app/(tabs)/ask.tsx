@@ -1,12 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance } from 'react-native';
-import { router } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, type ScrollViewInstance } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { C, F, R, TAB_BAR_SPACE, Tint, shadow } from '@/constants/theme';
+import { C, F, R, Tint, shadow } from '@/constants/theme';
+import { useKeyboardVisible, useTabBarSpace } from '@/hooks/useTabBarSpace';
+import { getClaudeKey } from '@/lib/secrets';
 import { Press, Row, T } from '@/components/ui';
 import { Icon, type IconName } from '@/components/Icon';
 import { Mascot } from '@/components/Mascot';
@@ -51,7 +53,16 @@ const VERDICT = {
 export default function Ask() {
   const { state, update } = useStore();
   const dog = state.dog!;
-  const provider = getProvider(state.aiProxyUrl, state.aiToken);
+  const [claudeKey, setClaudeKeyState] = useState<string | null>(null);
+  // Re-read the key whenever the tab is shown, in case it was just added or removed in settings.
+  useFocusEffect(
+    useCallback(() => {
+      getClaudeKey().then(setClaudeKeyState);
+    }, []),
+  );
+  const provider = getProvider(state.aiMode, { proxyUrl: state.aiProxyUrl, token: state.aiToken, claudeKey });
+  const tabSpace = useTabBarSpace();
+  const keyboard = useKeyboardVisible();
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [busy, setBusy] = useState(false);
@@ -122,19 +133,29 @@ export default function Ask() {
         </View>
         <View style={{ flex: 1 }}>
           <T v="h2">Ask Pawgress</T>
-          <Row gap={6}>
-            <View style={[styles.dot, { backgroundColor: provider.id === 'demo' ? C.butterDeep : C.ok }]} />
-            <T v="small">{provider.label}</T>
-          </Row>
+          <Pressable onPress={() => router.push('/ai')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Change AI connection">
+            <Row gap={6}>
+              <View style={[styles.dot, { backgroundColor: provider.id === 'demo' ? C.butterDeep : C.ok }]} />
+              <T v="small" numberOfLines={1} style={{ flexShrink: 1 }}>
+                {provider.label}
+              </T>
+              <T v="small" style={{ color: C.lavenderDeep, fontFamily: F.bodyHeavy }}>
+                Change
+              </T>
+            </Row>
+          </Pressable>
         </View>
         {state.chat.length > 0 && (
-          <Pressable onPress={() => update((s) => ({ ...s, chat: [] }))} hitSlop={10} accessibilityLabel="Clear chat" style={styles.clear}>
-            <Icon name="refresh" size={18} color={C.inkSoft} />
+          <Pressable onPress={() => update((s) => ({ ...s, chat: [] }))} accessibilityRole="button" accessibilityLabel="Start a new chat" style={styles.newChat}>
+            <Icon name="plus" size={16} color={C.ink} strokeWidth={2.6} />
+            <T v="bodyStrong" style={{ fontSize: 13 }}>
+              New chat
+            </T>
           </Pressable>
         )}
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView ref={scroller} contentContainerStyle={{ padding: 18, gap: 12, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
           {state.chat.length === 0 && (
             <Animated.View entering={FadeInDown} style={{ gap: 14 }}>
@@ -163,11 +184,11 @@ export default function Ask() {
                 </Animated.View>
               ))}
               {provider.id === 'demo' && (
-                <Press onPress={() => router.push('/profile')}>
+                <Press onPress={() => router.push('/ai')}>
                   <View style={[styles.demoNote]}>
                     <Icon name="spark" size={18} color={C.lavenderDeep} />
                     <T v="small" style={{ flex: 1, color: C.ink }}>
-                      Demo mode answers from built-in guides. Connect an AI server in Profile for photo understanding and open questions.
+                      Demo mode answers from built-in guides and can't read photos. Tap here to connect your own Claude account for photo answers and open questions.
                     </T>
                   </View>
                 </Press>
@@ -214,7 +235,7 @@ export default function Ask() {
           )}
         </ScrollView>
 
-        <View style={[styles.inputWrap, { marginBottom: TAB_BAR_SPACE - 30 }]}>
+        <View style={[styles.inputWrap, { paddingBottom: keyboard ? 10 : tabSpace + 34 }]}>
           {attachment && (
             <View style={styles.attachRow}>
               <Image source={{ uri: attachment.uri }} style={styles.thumb} contentFit="cover" />
@@ -258,7 +279,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingVertical: 8 },
   headAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.lavender, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  clear: { width: 40, height: 40, borderRadius: 20, backgroundColor: C.paper, alignItems: 'center', justifyContent: 'center' },
+  newChat: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 12, borderRadius: R.pill, backgroundColor: C.paper, borderWidth: 1.5, borderColor: C.line },
   intro: { alignItems: 'center', gap: 8, paddingVertical: 8 },
   suggestion: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.paper, borderRadius: R.lg, padding: 12, ...shadow },
   sIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
@@ -268,10 +289,10 @@ const styles = StyleSheet.create({
   verdict: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: R.pill, paddingHorizontal: 10, paddingVertical: 4 },
   photo: { width: 200, height: 160, borderRadius: 20, borderWidth: 3, borderColor: '#fff' },
   error: { backgroundColor: C.dangerSoft, borderRadius: R.md, padding: 12 },
-  inputWrap: { paddingHorizontal: 14, gap: 8 },
+  inputWrap: { paddingHorizontal: 14, paddingTop: 8, gap: 8, backgroundColor: C.bg },
   attachRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.paper, borderRadius: R.md, padding: 8 },
   thumb: { width: 40, height: 40, borderRadius: 10 },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, backgroundColor: C.paper, borderRadius: 28, padding: 6, ...shadow },
   inBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  input: { flex: 1, minHeight: 42, maxHeight: 110, fontFamily: F.bodySemi, fontSize: 15, color: C.ink, paddingHorizontal: 6, paddingTop: 11, paddingBottom: 10 },
+  input: { flex: 1, minHeight: 42, maxHeight: 110, fontFamily: F.bodySemi, fontSize: 15, color: C.ink, paddingHorizontal: 6, paddingTop: 11, paddingBottom: 10, textAlignVertical: 'center' },
 });

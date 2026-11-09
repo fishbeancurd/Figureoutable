@@ -14,7 +14,7 @@ Built with Expo (React Native) for iOS and Android. Everything is stored on the 
 
 ## What it does
 
-**1. Ask with photos.** A chat tab with camera and photo buttons. Ask "can she eat this?" with a picture, or ask about potty timing, portions, biting and more. Food answers get a clear Safe, Feed with care or Not safe tag, and warnings when a food matches your dog's allergies. The AI is pluggable (see [AI chat](#ai-chat)).
+**1. Ask with photos.** A chat tab with camera and photo buttons. Ask "can she eat this?" with a picture, or ask about potty timing, portions, biting and more. Food answers get a clear Safe, Feed with care or Not safe tag, and warnings when a food matches your dog's allergies. Each owner can connect their own Claude account (see [AI chat](#ai-chat)).
 
 **2. Profile and trackers.** Name, photo (or a cartoon in your dog's coat color), breed, birthday, weight, neutered status, energy level and allergies. Log meals, treats, walks, play, training, potty (with accidents and stool check), grooming, sleep, health symptoms and weigh-ins in a couple of taps.
 
@@ -25,7 +25,7 @@ Built with Expo (React Native) for iOS and Android. Everything is stored on the 
 
 - potty guidance: how long they can hold it, and how often to expect pee and poo
 - feeding, training, grooming (by coat type), socialization, health, exercise and sleep tips
-- 12 step-by-step lessons with progress, such as sit, come, crate training, potty training, tooth brushing and alone time
+- 25 step-by-step lessons across three levels, from sit and crate training to heel, roll over and emergency recall, plus your own custom skills
 
 **4. A daily plan that fits your schedule.** Onboarding asks when you wake, work and sleep. Pawgress then builds a routine of meals, walks, training, naps, grooming and potty breaks. Potty breaks are never further apart than your dog can hold it, and it flags the ones you'll need a walker for while you're at work. You can edit, add or delete tasks, choose their days, and rebuild the plan when your hours change. Reminders arrive 10 minutes before each task.
 
@@ -61,10 +61,11 @@ npx expo lint          # lint
 
 ## AI chat
 
-The chat works in two modes:
+Each person chooses what powers the chat in **Profile → AI connection**, so nobody shares one account:
 
-- **Demo mode (default).** No key is needed and nothing leaves the phone. It answers from Pawgress's built-in knowledge: about 35 common foods (safe, caution or toxic), calorie targets, potty timing, exercise, grooming, training and when to call the vet, all tailored to your dog. It cannot look at photos, and it says so.
-- **Claude through your own server.** For real photo understanding and open-ended questions, run the small proxy in [`server/`](server). It keeps your API key on your computer instead of inside the app.
+- **Demo mode (default).** Free, offline, no key. Answers from Pawgress's built-in knowledge: about 35 common foods (safe, caution or toxic), calorie targets, potty timing, exercise, grooming, training and when to call the vet, all tailored to your dog. It cannot read photos, and it says so.
+- **My Claude account.** The owner pastes their own Anthropic API key from [console.anthropic.com](https://console.anthropic.com/settings/keys). The key is kept in the phone's secure storage (iOS Keychain or Android Keystore) and is never included in backups. The phone calls Claude (`claude-opus-5-5`) directly, and usage is billed to that owner's Anthropic account, usually 1 to 5 US cents per question with a photo. Claude Pro and Max chat subscriptions can't be used by apps; an API key is required.
+- **My own server.** For developers: run the proxy in [`server/`](server), which holds the key, and enter its address.
 
 ```bash
 cd server
@@ -72,9 +73,21 @@ npm install
 ANTHROPIC_API_KEY=sk-ant-... npm start      # listens on port 8787
 ```
 
-Then in the app, open **Profile → AI connection**, enter `http://<your-computer's-local-IP>:8787` and tap **Save and test**. Your phone and computer must be on the same Wi-Fi. To stop others on your network from using it, set `APP_TOKEN=some-code` on the server and enter the same access code in the app. You can also bake the address into a build with `EXPO_PUBLIC_AI_PROXY_URL`.
+To stop others on your network from using the server, set `APP_TOKEN=some-code` on the server and enter the same access code in the app. You can also bake an address into a build with `EXPO_PUBLIC_AI_PROXY_URL`.
 
-The server uses `claude-opus-5-5` by default (override with `PAWGRESS_MODEL`). It shrinks photos to 1024 px before upload, tells the model your dog's profile, and asks it to lead food answers with a safety verdict.
+## Training and XP
+
+- **Skills and levels.** 25 lessons split into Beginner, Intermediate and Advanced. Finishing 3 lessons in a level unlocks the next, and owners of fast learners can unlock a level early. Owners can also add their own skills, with a cue word and difficulty.
+- **Mastery.** Every logged practice session adds to that skill: "Nailed it" counts 3 points, "Getting there" 2 and "Tricky" 1. Skills climb from Learning to Getting it, Reliable and Mastered (1 to 4 stars).
+- **XP depends on effort.** Longer walks and training sessions, harder skills, "Nailed it" sessions, right-sized meals, treats within budget, and tougher grooming jobs (nails, baths) earn more. The Save button shows the XP and a breakdown before you log, and **How XP works** (tap the level card) lists every rule.
+
+## Publishing to Expo Go
+
+The app is linked to the Expo project `@fishbeancurd/pawgress`. To publish a new version that opens in Expo Go:
+
+```bash
+npx eas-cli@latest update --branch preview --environment preview --message "What changed"
+```
 
 ## Project layout
 
