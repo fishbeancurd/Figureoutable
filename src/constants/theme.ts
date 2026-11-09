@@ -1,65 +1,65 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://unistyl.es/), etc.
- */
+// Pawgress design tokens: cozy pastel (lavender, mint, peach, butter) with a deep plum ink
+// and a floating dark pill navigation, as picked in the style review.
 
-import '@/global.css';
+export const C = {
+  bg: '#F4F0FB',
+  paper: '#FFFFFF',
+  ink: '#33284A',
+  inkSoft: '#766C88',
+  inkFaint: '#B2A9C2',
+  line: '#E7E1F2',
 
-import { Platform } from 'react-native';
+  lavender: '#E1D9F7',
+  lavenderDeep: '#A996EC',
+  peach: '#FFDCCB',
+  peachDeep: '#FF9C74',
+  mint: '#D2ECDA',
+  mintDeep: '#6DB487',
+  butter: '#FCEDBC',
+  butterDeep: '#E6B94A',
+  sky: '#D5E7FA',
+  skyDeep: '#6FA6E4',
+  rose: '#FBD6DF',
+  roseDeep: '#E7708E',
 
-export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
+  pill: '#2E2541',
+  danger: '#E2574C',
+  dangerSoft: '#FDE0DC',
+  ok: '#4FA470',
+  okSoft: '#DDF2E3',
+  warn: '#D99A1E',
+  warnSoft: '#FCEFCB',
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
-
-export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+export const F = {
+  display: 'Grandstander_700Bold',
+  displayMed: 'Grandstander_600SemiBold',
+  body: 'Mulish_400Regular',
+  bodySemi: 'Mulish_600SemiBold',
+  bodyBold: 'Mulish_700Bold',
+  bodyHeavy: 'Mulish_800ExtraBold',
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+export const R = { sm: 12, md: 18, lg: 24, xl: 30, pill: 999 } as const;
+
+export const shadow = {
+  shadowColor: '#4B3B78',
+  shadowOpacity: 0.12,
+  shadowRadius: 16,
+  shadowOffset: { width: 0, height: 8 },
+  elevation: 4,
+} as const;
+
+/** Pastel pairs used for categories: [soft background, strong accent]. */
+export const Tint = {
+  lavender: [C.lavender, C.lavenderDeep],
+  peach: [C.peach, C.peachDeep],
+  mint: [C.mint, C.mintDeep],
+  butter: [C.butter, C.butterDeep],
+  sky: [C.sky, C.skyDeep],
+  rose: [C.rose, C.roseDeep],
+} as const;
+export type TintName = keyof typeof Tint;
+
+/** Space reserved at the bottom of tab screens for the floating nav. */
+export const TAB_BAR_SPACE = 120;

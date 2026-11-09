@@ -1,0 +1,13 @@
+{
+  "name": "pawgress-ai-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Keeps the AI API key off the phone. The Pawgress app sends chat messages here and this forwards them to Claude.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0"
+  }
+}

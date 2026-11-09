@@ -1,18 +1,26 @@
 {
   "expo": {
-    "name": "tpl",
-    "slug": "tpl",
+    "name": "Pawgress",
+    "slug": "pawgress",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "tpl",
-    "userInterfaceStyle": "automatic",
+    "scheme": "pawgress",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F4F0FB",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "supportsTablet": false,
+      "bundleIdentifier": "com.pawgress.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Pawgress uses the camera so you can snap a food, toy or symptom and ask about it, and to take your dog's profile photo.",
+        "NSPhotoLibraryUsageDescription": "Pawgress lets you pick photos to ask about or to use as your dog's profile picture."
+      }
     },
     "android": {
+      "package": "com.pawgress.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#E1D9F7",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -20,7 +28,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "server",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -28,11 +36,25 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#F4F0FB",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pawgress lets you pick photos to ask about or to use as your dog's profile picture.",
+          "cameraPermission": "Pawgress uses the camera so you can snap a food, toy or symptom and ask about it."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FF9C74"
+        }
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
