@@ -91,6 +91,12 @@ Add as many dogs as you have from **Add dog** at the top of Home (or **Profile â
 - **Mastery.** Every logged practice session adds to that skill: "Nailed it" counts 3 points, "Getting there" 2 and "Tricky" 1. Skills climb from Learning to Getting it, Reliable and Mastered (1 to 4 stars).
 - **XP depends on effort.** Longer walks and training sessions, harder skills, "Nailed it" sessions, right-sized meals, treats within budget, and tougher grooming jobs (nails, baths) earn more. The Save button shows the XP and a breakdown before you log, and **How XP works** (tap the level card) lists every rule.
 
+## Share with friends
+
+Send [`docs/share/pawgress-share-card.png`](docs/share/pawgress-share-card.png). Friends install **Expo Go**, then scan the code (iPhone: Camera app; Android: **Scan QR code** inside Expo Go). The code points to the `preview` channel, so it always opens the newest published version. No Expo account is needed to open it.
+
+Link inside the code: `exp://u.expo.dev/7b581e7c-38c9-4d4e-9830-55c5f4a940c6?channel-name=preview&runtime-version=exposdk:58.0.0`
+
 ## Publishing to Expo Go
 
 The app is linked to the Expo project `@fishbeancurd/pawgress`. To publish a new version that opens in Expo Go:
