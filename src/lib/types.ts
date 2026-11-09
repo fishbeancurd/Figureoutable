@@ -131,6 +131,21 @@ export interface ChatMessage {
   at: string;
 }
 
+/** Everything that belongs to one dog. The active dog's data sits at the top level of AppState. */
+export interface DogData {
+  dog: Dog;
+  foods: Food[];
+  logs: LogEntry[];
+  routine: RoutineItem[];
+  routineDone: Record<string, string[]>;
+  lessonSteps: Record<string, number[]>;
+  checklists: Record<string, string[]>;
+  milestones: Record<string, string>;
+  chat: ChatMessage[];
+  customSkills: CustomSkill[];
+  unlockedLevels: SkillLevel[];
+}
+
 export interface AppState {
   version: 1;
   onboarded: boolean;
@@ -150,4 +165,7 @@ export interface AppState {
   remindersOn: boolean;
   customSkills: CustomSkill[];
   unlockedLevels: SkillLevel[]; // training levels unlocked early by the owner
+  // Other dogs in the household (not the one currently shown) and the display order of all dogs.
+  otherDogs: DogData[];
+  dogOrder: string[];
 }

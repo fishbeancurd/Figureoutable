@@ -3,12 +3,13 @@ import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-na
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { C, F, R, Tint, shadow } from '@/constants/theme';
 import { Badge, Button, Card, Field, Press, Ring, Row, Screen, Segmented, SectionTitle, T } from '@/components/ui';
+import { DogSwitcher } from '@/components/DogSwitcher';
 import { Icon } from '@/components/Icon';
 import { useCelebrate } from '@/components/Celebrate';
 import { useStore } from '@/lib/store';
 import type { Owner, RoutineItem } from '@/lib/types';
 import { buildRoutine, fmtTime, fromMin, ROUTINE_TYPE_TINT, toMin } from '@/lib/routine';
-import { remindersSupported, syncReminders } from '@/lib/reminders';
+import { remindersSupported } from '@/lib/reminders';
 import { dayKey, snapshot } from '@/lib/dogmath';
 import { pottyGuide } from '@/data/stages';
 import { uid } from '@/lib/util';
@@ -49,9 +50,8 @@ export default function Plan() {
   const nextId = isToday ? items.find((i) => !done.includes(i.id) && i.time >= nowHHMM)?.id : undefined;
 
   const persistRoutine = async (routine: RoutineItem[], remindersOn = state.remindersOn) => {
+    // Reminders re-sync automatically when any plan changes (see the store).
     update((s) => ({ ...s, routine, remindersOn }));
-    const synced = await syncReminders(routine, dog.name, remindersOn).catch(() => routine);
-    update((s) => ({ ...s, routine: synced }));
   };
 
   const toggleDone = (item: RoutineItem) => {
@@ -86,6 +86,8 @@ export default function Plan() {
           </T>
         </Ring>
       </Row>
+
+      <DogSwitcher />
 
       {/* Day strip */}
       <Row gap={6} style={{ justifyContent: 'space-between' }}>
@@ -185,8 +187,13 @@ export default function Plan() {
         owner={state.owner}
         onClose={() => setSchedOpen(false)}
         onApply={(owner) => {
-          update((s) => ({ ...s, owner }));
-          persistRoutine(buildRoutine(dog, owner));
+          // Your hours affect every dog, so rebuild all of their plans.
+          update((s) => ({
+            ...s,
+            owner,
+            routine: s.dog ? buildRoutine(s.dog, owner) : s.routine,
+            otherDogs: s.otherDogs.map((d) => ({ ...d, routine: buildRoutine(d.dog, owner) })),
+          }));
           setSchedOpen(false);
         }}
       />
@@ -300,7 +307,7 @@ function ScheduleSheet({ open, owner, onClose, onApply }: { open: boolean; owner
   const [o, setO] = useState(owner);
   return (
     <Sheet open={open} onClose={onClose} title="Fit to my day">
-      <T style={{ color: C.inkSoft }}>Update your hours and we'll rebuild the plan. This replaces your current tasks, including ones you edited.</T>
+      <T style={{ color: C.inkSoft }}>Update your hours and we'll rebuild the plan for each of your dogs. This replaces their current tasks, including ones you edited.</T>
       <Card style={{ gap: 14 }}>
         <TimeRow label="Wake up" value={o.wake} onChange={(v) => setO({ ...o, wake: v })} />
         <TimeRow label="Bedtime" value={o.bed} onChange={(v) => setO({ ...o, bed: v })} />

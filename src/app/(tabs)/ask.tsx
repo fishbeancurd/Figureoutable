@@ -12,6 +12,7 @@ import { getClaudeKey } from '@/lib/secrets';
 import { Press, Row, T } from '@/components/ui';
 import { Icon, type IconName } from '@/components/Icon';
 import { Mascot } from '@/components/Mascot';
+import { DogSwitcher } from '@/components/DogSwitcher';
 import { useStore } from '@/lib/store';
 import { getProvider, toOutgoing } from '@/lib/ai';
 import type { ChatMessage } from '@/lib/types';
@@ -153,6 +154,10 @@ export default function Ask() {
             </T>
           </Pressable>
         )}
+      </View>
+
+      <View style={{ paddingHorizontal: 18, paddingBottom: 4 }}>
+        <DogSwitcher />
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">

@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { C, F, R } from '@/constants/theme';
 import { Badge, Button, Card, Chip, DogAvatar, Field, Row, Screen, Segmented, SectionTitle, Stepper, T, TopBar } from '@/components/ui';
 import { FUR_COLORS } from '@/components/Mascot';
-import { useGame, useStore } from '@/lib/store';
+import { allDogs, initialState, useGame, useStore } from '@/lib/store';
 import { ageLabel, levelTitle, snapshot } from '@/lib/dogmath';
 import { BREEDS, findBreed } from '@/data/breeds';
 import { Icon } from '@/components/Icon';
@@ -55,7 +55,7 @@ export default function Profile() {
     try {
       const parsed = JSON.parse(importText) as AppState;
       if (!parsed.dog || !Array.isArray(parsed.logs)) throw new Error();
-      update(() => ({ ...parsed, onboarded: true }));
+      update(() => ({ ...initialState(), ...parsed, onboarded: true }));
       setImportMsg(`Restored ${parsed.dog.name} with ${parsed.logs.length} log entries.`);
       setImportText('');
     } catch {
@@ -89,6 +89,14 @@ export default function Profile() {
           </Row>
         )}
       </View>
+
+      <Card style={{ gap: 4 }} onPress={() => router.push('/dogs')}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <T v="bodyStrong">Your dogs · {allDogs(state).length}</T>
+          <Icon name="chevron" size={18} color={C.inkSoft} />
+        </Row>
+        <T v="small">Switch, add or remove dogs. This page edits {dog.name}.</T>
+      </Card>
 
       {/* Dog details */}
       <SectionTitle title="About your dog" />
@@ -161,7 +169,7 @@ export default function Profile() {
 
       <Card style={{ gap: 10 }}>
         <T v="h3">Start over</T>
-        <T v="small">Deletes {dog.name}'s profile, logs and plan from this phone. This can't be undone.</T>
+        <T v="small">Deletes all your dogs, logs and plans from this phone. This can't be undone.</T>
         {confirmReset ? (
           <Row gap={10}>
             <Button label="Keep my data" kind="ghost" style={{ flex: 1 }} onPress={() => setConfirmReset(false)} />

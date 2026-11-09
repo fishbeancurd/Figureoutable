@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { C, R, Tint } from '@/constants/theme';
 import { Badge, Card, Chip, CountBadge, Press, ProgressBar, Row, Screen, SectionTitle, T } from '@/components/ui';
+import { DogSwitcher } from '@/components/DogSwitcher';
 import { Icon } from '@/components/Icon';
 import { Mascot } from '@/components/Mascot';
 import { useStore } from '@/lib/store';
@@ -33,6 +34,8 @@ export default function Learn() {
         <T v="h1">Learn and grow</T>
         <T v="small">Guides picked for {dog.name}'s stage</T>
       </View>
+
+      <DogSwitcher />
 
       {/* Stage card */}
       <Card tint={snap.stage.tint} style={{ gap: 10 }} onPress={() => router.push('/journey')}>

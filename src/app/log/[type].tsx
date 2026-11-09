@@ -7,7 +7,7 @@ import { C, F, Tint } from '@/constants/theme';
 import { Badge, Button, Card, Chip, Field, Row, Segmented, Stepper, T } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { useCelebrate } from '@/components/Celebrate';
-import { totalXp, useStore } from '@/lib/store';
+import { allDogs, totalXp, useStore } from '@/lib/store';
 import type { Food, GroomTask, Liking, LogEntry, LogType, Reaction, TrainingRating, TreatValue } from '@/lib/types';
 import { allSkills, levelUnlocked, skillLevelOf, skillMastery } from '@/lib/skills';
 import { LOG_META } from '@/data/logMeta';
@@ -67,6 +67,10 @@ export default function LogScreen() {
   const [kg, setKg] = useState(latestWeightKg(dog) ?? +expectedWeightKg(dog, ageWeeks(dog.birthDate)).toFixed(1));
   const [note, setNote] = useState('');
   const [whenMin, setWhenMin] = useState(0);
+  // Walks, play, potty trips, grooming and training are often done with several dogs at once.
+  const otherDogs = allDogs(state).filter((d) => d.dog.id !== dog.id);
+  const shareable = ['walk', 'play', 'sleep', 'grooming', 'training', 'potty'].includes(type) && otherDogs.length > 0;
+  const [also, setAlso] = useState<string[]>([]);
 
   const kcal = food ? Math.round(amount * food.kcalPerUnit) : 0;
   const todayKcal = sumKcal(logsOn(state.logs, new Date()));
@@ -126,10 +130,12 @@ export default function LogScreen() {
         break;
     }
     const before = levelFromXp(totalXp(state)).level;
-    const { xp, leveledUp } = addLog({ ...entry, xp: xpPreview.xp, note: note.trim() || undefined, at });
+    const alsoFor = shareable ? also : [];
+    const { xp, leveledUp } = addLog({ ...entry, xp: xpPreview.xp, note: note.trim() || undefined, at }, alsoFor);
+    const names = [dog.name, ...otherDogs.filter((d) => alsoFor.includes(d.dog.id)).map((d) => d.dog.name)];
     celebrate({
       xp,
-      title: type === 'potty' && accident ? 'Logged. Accidents happen!' : `${meta.label} logged`,
+      title: type === 'potty' && accident ? 'Logged. Accidents happen!' : `${meta.label} logged${names.length > 1 ? ` for ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : ''}`,
       levelUp: leveledUp ? `Level up! You're now level ${before + 1}` : undefined,
     });
     if (router.canGoBack()) router.back();
@@ -318,6 +324,25 @@ export default function LogScreen() {
             </Card>
           )}
 
+          {shareable && (
+            <View style={{ gap: 6 }}>
+              <T v="label">Also log for</T>
+              <Row gap={8} style={{ flexWrap: 'wrap' }}>
+                {otherDogs.map((d) => (
+                  <Chip
+                    key={d.dog.id}
+                    label={d.dog.name}
+                    icon="paw"
+                    tint={meta.tint}
+                    active={also.includes(d.dog.id)}
+                    onPress={() => setAlso((cur) => (cur.includes(d.dog.id) ? cur.filter((x) => x !== d.dog.id) : [...cur, d.dog.id]))}
+                  />
+                ))}
+              </Row>
+              {also.length > 0 && <T v="small">Saved to each dog, and each one earns its own XP.</T>}
+            </View>
+          )}
+
           <View style={{ gap: 6 }}>
             <T v="label">When?</T>
             <Row gap={8} style={{ flexWrap: 'wrap' }}>
@@ -337,7 +362,7 @@ export default function LogScreen() {
               </T>
             </Pressable>
           </View>
-          <Button label={`Save · +${xpPreview.xp} XP`} icon="check" onPress={save} disabled={(type === 'meal' || type === 'treat') && !food} />
+          <Button label={`Save · +${xpPreview.xp * (1 + (shareable ? also.length : 0))} XP`} icon="check" onPress={save} disabled={(type === 'meal' || type === 'treat') && !food} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

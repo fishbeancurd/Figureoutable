@@ -75,6 +75,16 @@ ANTHROPIC_API_KEY=sk-ant-... npm start      # listens on port 8787
 
 To stop others on your network from using the server, set `APP_TOKEN=some-code` on the server and enter the same access code in the app. You can also bake an address into a build with `EXPO_PUBLIC_AI_PROXY_URL`.
 
+## Several dogs
+
+Add as many dogs as you have from **Add dog** at the top of Home (or **Profile → Your dogs**).
+
+- Each dog keeps its own profile, food likes and allergies, logs, daily plan, lessons, skills, milestones and chat.
+- You, your schedule, the AI connection and your XP level are shared. Caring for every dog counts toward your level and streak.
+- Switch dogs from the row of avatars at the top of each tab. Tap the dog that's already selected to manage your dogs.
+- Walks, play, potty trips, grooming and training can be logged for several dogs at once with **Also log for**.
+- Reminders for the same task at the same time are combined, like "Breakfast for Mochi and Pepper". Changing your hours in **Fit to my day** rebuilds every dog's plan.
+
 ## Training and XP
 
 - **Skills and levels.** 25 lessons split into Beginner, Intermediate and Advanced. Finishing 3 lessons in a level unlocks the next, and owners of fast learners can unlock a level early. Owners can also add their own skills, with a cue word and difficulty.

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInDown, FadeInRight, FadeOutLeft } from 'react-native-reanimated';
@@ -9,12 +9,11 @@ import { Badge, Button, Card, Chip, DogAvatar, Field, Press, Row, Segmented, Ste
 import { Icon } from '@/components/Icon';
 import { FUR_COLORS, Mascot } from '@/components/Mascot';
 import { BREEDS, SIZE_INFO, findBreed } from '@/data/breeds';
-import { DEFAULT_OWNER, sampleState, useStore } from '@/lib/store';
+import { DEFAULT_OWNER, addDogState, allDogs, freshDogData, sampleState, useStore } from '@/lib/store';
 import type { Activity, Dog, Owner, Sex, SizeClass } from '@/lib/types';
 import { isoDate, uid } from '@/lib/util';
 import { ageLabel, snapshot } from '@/lib/dogmath';
 import { buildRoutine, fmtTime, fromMin, toMin } from '@/lib/routine';
-import { syncReminders } from '@/lib/reminders';
 import { pottyGuide } from '@/data/stages';
 
 const ALLERGY_OPTIONS = ['Chicken', 'Beef', 'Dairy', 'Wheat', 'Soy', 'Egg', 'Lamb', 'Fish', 'Corn'];
@@ -41,13 +40,21 @@ function TimeStepper({ label, value, onChange }: { label: string; value: string;
 }
 
 export default function Onboarding() {
-  const { update } = useStore();
-  const [step, setStep] = useState<Step>('welcome');
-  const idx = STEPS.indexOf(step);
+  const { state, update } = useStore();
+  // "?mode=add" adds another dog to an existing household: no welcome screen and no owner schedule step.
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const adding = mode === 'add' && !!state.dog;
+  const steps: readonly Step[] = adding ? STEPS.filter((x) => x !== 'welcome' && x !== 'day') : STEPS;
+  const [step, setStep] = useState<Step>(adding ? 'name' : 'welcome');
+  const idx = steps.indexOf(step);
+  const dotSteps: Step[] = steps.filter((x) => x !== 'welcome');
+  const dotIdx = dotSteps.indexOf(step);
 
   const [name, setName] = useState('');
   const [photoUri, setPhotoUri] = useState<string | undefined>();
-  const [fur, setFur] = useState(FUR_COLORS[0]);
+  // Give each new dog a coat color the other dogs aren't using, so their cartoons look different.
+  const usedFur = adding ? allDogs(state).map((d) => d.dog.furColor ?? FUR_COLORS[0]) : [];
+  const [fur, setFur] = useState(FUR_COLORS.find((c) => !usedFur.includes(c)) ?? FUR_COLORS[0]);
   const [breed, setBreed] = useState('');
   const [query, setQuery] = useState('');
   const [size, setSize] = useState<SizeClass>('medium');
@@ -60,7 +67,7 @@ export default function Onboarding() {
   const [activity, setActivity] = useState<Activity>('normal');
   const [allergies, setAllergies] = useState<string[]>([]);
   const [customAllergy, setCustomAllergy] = useState('');
-  const [owner, setOwner] = useState<Owner>(DEFAULT_OWNER);
+  const [owner, setOwner] = useState<Owner>(adding ? state.owner : DEFAULT_OWNER);
 
   const birthDate = useMemo(() => {
     const d = new Date();
@@ -86,8 +93,15 @@ export default function Onboarding() {
     weights: weightKg > 0 ? [{ date: isoDate(new Date()), kg: weightKg }] : [],
   };
 
-  const next = () => setStep(STEPS[Math.min(idx + 1, STEPS.length - 1)]);
-  const back = () => setStep(STEPS[Math.max(idx - 1, 0)]);
+  const next = () => setStep(steps[Math.min(idx + 1, steps.length - 1)]);
+  const back = () => {
+    if (adding && idx === 0) {
+      if (router.canGoBack()) router.back();
+      else router.replace('/');
+      return;
+    }
+    setStep(steps[Math.max(idx - 1, 0)]);
+  };
 
   const pickPhoto = async (camera: boolean) => {
     const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -109,18 +123,20 @@ export default function Onboarding() {
 
   const finish = async () => {
     const dog: Dog = { ...draftDog, id: uid(), name: name.trim() || 'Pup' };
+    if (adding) {
+      update((s) => addDogState(s, freshDogData(dog, buildRoutine(dog, s.owner))));
+      router.replace('/');
+      return;
+    }
     const routine = buildRoutine(dog, owner);
-    update((s) => ({ ...s, onboarded: true, dog, owner, routine }));
+    update((s) => ({ ...s, onboarded: true, dog, owner, routine, dogOrder: [dog.id] }));
     router.replace('/');
-    const synced = await syncReminders(routine, dog.name, true).catch(() => routine);
-    update((s) => ({ ...s, routine: synced }));
   };
 
   const useSample = () => {
     const s = sampleState();
     update(() => s);
     router.replace('/');
-    syncReminders(s.routine, s.dog!.name, true).catch(() => {});
   };
 
   const filteredBreeds = BREEDS.filter((b) => b.name.toLowerCase().includes(query.toLowerCase()));
@@ -132,15 +148,15 @@ export default function Onboarding() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         {step !== 'welcome' && (
           <View style={styles.header}>
             <Pressable onPress={back} hitSlop={12} accessibilityLabel="Back" style={styles.backBtn}>
               <Icon name="back" size={22} />
             </Pressable>
             <View style={styles.dots}>
-              {STEPS.slice(1).map((s, i) => (
-                <View key={s} style={[styles.dot, i < idx && { backgroundColor: C.peachDeep, width: i === idx - 1 ? 22 : 8 }]} />
+              {dotSteps.map((s, i) => (
+                <View key={s} style={[styles.dot, i <= dotIdx && { backgroundColor: C.peachDeep, width: i === dotIdx ? 22 : 8 }]} />
               ))}
             </View>
             <View style={{ width: 40 }} />

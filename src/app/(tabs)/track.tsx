@@ -3,6 +3,7 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { C, R, Tint } from '@/constants/theme';
 import { Badge, Button, Card, Chip, Press, Row, Screen, Segmented, SectionTitle, T } from '@/components/ui';
+import { DogSwitcher } from '@/components/DogSwitcher';
 import { Icon } from '@/components/Icon';
 import { BarChart, GrowthChart, HourDots } from '@/components/Charts';
 import { useStore } from '@/lib/store';
@@ -101,6 +102,7 @@ export default function Track() {
           </T>
         </View>
       </Row>
+      <DogSwitcher />
       <Segmented options={[{ value: 'week', label: 'This week' }, { value: 'month', label: 'Last 4 weeks' }]} value={range} onChange={setRange} />
 
       {/* Growth */}

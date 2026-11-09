@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { C, F, R, Tint, shadow } from '@/constants/theme';
 import { Badge, Button, Card, DogAvatar, IconBubble, Press, ProgressBar, Ring, Row, Screen, SectionTitle, T } from '@/components/ui';
+import { DogSwitcher } from '@/components/DogSwitcher';
 import { Icon } from '@/components/Icon';
 import { useCelebrate } from '@/components/Celebrate';
 import { useGame, useStore } from '@/lib/store';
@@ -76,8 +77,10 @@ export default function Home() {
         </View>
       </Row>
 
+      <DogSwitcher showAdd />
+
       {/* Level hero */}
-      <Animated.View entering={FadeInDown.duration(500)}>
+      <Animated.View key={dog.id} entering={FadeInDown.duration(500)}>
         <Press onPress={() => router.push('/xp')} accessibilityLabel="How XP works">
         <LinearGradient colors={['#B9A8F2', '#9C88EC']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
           <View style={[styles.heroBlob, { right: -40, top: -50, backgroundColor: 'rgba(255,255,255,0.14)' }]} />
